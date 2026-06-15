@@ -20,6 +20,12 @@ cask "happier" do
     end
   end
 
+  postflight do
+    system_command "/usr/bin/xattr",
+      args: ["-d", "com.apple.quarantine", "#{staged_path}/happier/happier"],
+      sudo: false
+  end
+
   binary "happier/happier"
 
   zap trash: [
