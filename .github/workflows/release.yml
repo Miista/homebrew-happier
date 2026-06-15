@@ -62,9 +62,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install yarn
-        run: npm install -g yarn
-
       - name: Build binaries
         run: bash scripts/build-cli.sh happier-src dist
 
