@@ -14,6 +14,8 @@ cask "happier" do
   desc "Mobile and Web client for Claude Code and Codex"
   homepage "https://github.com/happier-dev/happier"
 
+  depends_on macos: true
+
   preflight do
     Dir["#{staged_path}/happier-v#{version}-darwin-*"].each do |dir|
       FileUtils.mv(dir, "#{staged_path}/happier")
