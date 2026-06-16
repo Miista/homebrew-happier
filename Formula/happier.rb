@@ -3,7 +3,7 @@ class Happier < Formula
   homepage "https://github.com/happier-dev/happier"
   version "0.2.1"
 
-  conflicts_with "happier@preview",
+  conflicts_with "happier@next",
     because: "both install the `happier` binary"
 
   on_macos do
