@@ -28,7 +28,7 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-          CURRENT=$(grep '^\s*version ' Casks/happier.rb | grep -o '[0-9.]*')
+          CURRENT=$(grep '^\s*version ' Formula/happier.rb | grep -o '[0-9.]*')
           if [ "$CURRENT" = "$VERSION" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already at v${VERSION}, skipping."
@@ -44,26 +44,44 @@ jobs:
           VERSION="${{ steps.resolve.outputs.version }}"
           BASE="https://github.com/happier-dev/happier/releases/download/cli-v${VERSION}"
           SUMS=$(curl -sf "${BASE}/checksums-happier-v${VERSION}.txt")
-          ARM64=$(echo "$SUMS" | awk '/darwin-arm64/ {print $1}')
-          X64=$(echo "$SUMS"   | awk '/darwin-x64/   {print $1}')
-          echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
-          echo "x64=$X64"     >> "$GITHUB_OUTPUT"
+          DARWIN_ARM64=$(echo "$SUMS" | awk '/darwin-arm64/ {print $1}')
+          DARWIN_X64=$(echo   "$SUMS" | awk '/darwin-x64/   {print $1}')
+          LINUX_ARM64=$(echo  "$SUMS" | awk '/linux-arm64/  {print $1}')
+          LINUX_X64=$(echo    "$SUMS" | awk '/linux-x64/    {print $1}')
+          echo "darwin_arm64=$DARWIN_ARM64" >> "$GITHUB_OUTPUT"
+          echo "darwin_x64=$DARWIN_X64"     >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$LINUX_ARM64"   >> "$GITHUB_OUTPUT"
+          echo "linux_x64=$LINUX_X64"       >> "$GITHUB_OUTPUT"
 
       - name: Update formula
         if: steps.resolve.outputs.skip == 'false'
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
-          ARM64="${{ steps.checksums.outputs.arm64 }}"
-          X64="${{ steps.checksums.outputs.x64 }}"
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/happier.rb
-          sed -i "s|sha256 \"[a-f0-9]*\" # arm64|sha256 \"${ARM64}\" # arm64|" Casks/happier.rb
-          sed -i "s|sha256 \"[a-f0-9]*\" # x64|sha256 \"${X64}\" # x64|" Casks/happier.rb
+          python3 - <<EOF
+          import re, pathlib
+          p = pathlib.Path("Formula/happier.rb")
+          s = p.read_text()
+          s = re.sub(r'version "[^"]+"', 'version "${VERSION}"', s, count=1)
+          sums = {
+            "darwin-arm64": "${{ steps.checksums.outputs.darwin_arm64 }}",
+            "darwin-x64":   "${{ steps.checksums.outputs.darwin_x64 }}",
+            "linux-arm64":  "${{ steps.checksums.outputs.linux_arm64 }}",
+            "linux-x64":    "${{ steps.checksums.outputs.linux_x64 }}",
+          }
+          for platform, sha in sums.items():
+            s = re.sub(
+              r'(' + re.escape(platform) + r'\.tar\.gz"\s*\n\s*sha256 ")[a-f0-9]+(")',
+              r'\g<1>' + sha + r'\g<2>',
+              s,
+            )
+          p.write_text(s)
+          EOF
 
       - name: Commit and push
         if: steps.resolve.outputs.skip == 'false'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/happier.rb
+          git add Formula/happier.rb
           git commit -m "Update happier to v${{ steps.resolve.outputs.version }}"
           git push
