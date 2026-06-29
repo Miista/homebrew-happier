@@ -11,7 +11,7 @@ on:
         description: 'Force a specific version (only valid when channel is a single channel)'
         required: false
   schedule:
-    - cron: '0 * * * *'  # check every hour
+    - cron: '0 */3 * * *'  # check every 3 hours
 
 jobs:
   update:
