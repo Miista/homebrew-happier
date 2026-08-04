@@ -21,13 +21,16 @@ jobs:
       matrix:
         include:
           - channel: latest
+            version_source: npm
             npm_tag: latest
             formula: Formula/happier.rb
           - channel: next
+            version_source: npm
             npm_tag: next
             formula: Formula/happier-next.rb
           - channel: dev
-            npm_tag: dev
+            version_source: github
+            github_tag: cli-dev
             formula: Formula/happier-dev.rb
     steps:
       - name: Skip non-matching channel
@@ -46,6 +49,11 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.version }}" ] && [ "${{ github.event.inputs.channel }}" = "${{ matrix.channel }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ matrix.version_source }}" = "github" ]; then
+            # Rolling tag: GitHub appends newest assets last, so take the last matching asset name.
+            ASSET=$(curl -sf "https://api.github.com/repos/happier-dev/happier/releases/tags/${{ matrix.github_tag }}" \
+              | jq -r '[.assets[].name | select(test("^happier-v.*-darwin-arm64\\.tar\\.gz$"))] | last')
+            VERSION=$(echo "$ASSET" | sed -E 's/^happier-v(.*)-darwin-arm64\.tar\.gz$/\1/')
           else
             VERSION=$(curl -sf "https://registry.npmjs.org/@happier-dev/cli" | jq -r '."dist-tags"."${{ matrix.npm_tag }}"')
           fi
