@@ -25,10 +25,10 @@ jobs:
             formula: Formula/happier.rb
           - channel: next
             npm_tag: next
-            formula: Formula/happier@next.rb
+            formula: Formula/happier-next.rb
           - channel: dev
             npm_tag: dev
-            formula: Formula/happier@dev.rb
+            formula: Formula/happier-dev.rb
     steps:
       - name: Skip non-matching channel
         if: github.event.inputs.channel != '' && github.event.inputs.channel != 'all' && github.event.inputs.channel != matrix.channel
