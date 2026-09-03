@@ -25,8 +25,8 @@ jobs:
             npm_tag: latest
             formula: Formula/happier.rb
           - channel: next
-            version_source: npm
-            npm_tag: next
+            version_source: github
+            github_tag: cli-preview
             formula: Formula/happier-next.rb
           - channel: dev
             version_source: github
