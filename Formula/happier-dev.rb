@@ -1,7 +1,7 @@
 class HappierDev < Formula
   desc "Mobile and Web client for Claude Code and Codex (dev channel)"
   homepage "https://github.com/happier-dev/happier"
-  version "0.2.11-dev.1"
+  version "0.2.11-dev.2"
 
   conflicts_with "happier",
     because: "both install the `happier` binary"
