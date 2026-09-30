@@ -1,7 +1,7 @@
 class HappierNext < Formula
   desc "Mobile and Web client for Claude Code and Codex (next/preview channel)"
   homepage "https://github.com/happier-dev/happier"
-  version "0.2.12-preview.1"
+  version "0.2.13-preview.1"
 
   conflicts_with "happier",
     because: "both install the `happier` binary"
