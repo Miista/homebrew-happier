@@ -11,7 +11,7 @@ on:
         description: 'Force a specific version (only valid when channel is a single channel)'
         required: false
   schedule:
-    - cron: '0 */3 * * *'  # check every 3 hours
+    - cron: '17 * * * *'  # hourly; GitHub often delays/drops scheduled runs, so poll more often than needed
 
 jobs:
   update:
@@ -22,16 +22,13 @@ jobs:
       matrix:
         include:
           - channel: latest
-            version_source: npm
-            npm_tag: latest
+            version_pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
             formula: Formula/happier.rb
           - channel: next
-            version_source: github
-            github_tag: cli-preview
+            version_pattern: '-preview\.[0-9]+$'
             formula: Formula/happier-next.rb
           - channel: dev
-            version_source: github
-            github_tag: cli-dev
+            version_pattern: '-dev\.[0-9]+$'
             formula: Formula/happier-dev.rb
     steps:
       - name: Skip non-matching channel
@@ -47,22 +44,35 @@ jobs:
       - name: Resolve version
         if: env.SKIP != 'true'
         id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "${{ github.event.inputs.version }}" ] && [ "${{ github.event.inputs.channel }}" = "${{ matrix.channel }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
-          elif [ "${{ matrix.version_source }}" = "github" ]; then
-            # Rolling tag: GitHub appends newest assets last, so take the last matching asset name.
-            # Version is read from the checksums filename, since tarball asset names are not always versioned.
-            ASSET=$(curl -sf "https://api.github.com/repos/happier-dev/happier/releases/tags/${{ matrix.github_tag }}" \
-              | jq -r '[.assets[].name | select(test("^checksums-happier-v.*\\.txt$"))] | last')
-            VERSION=$(echo "$ASSET" | sed -E 's/^checksums-happier-v(.*)\.txt$/\1/')
           else
-            VERSION=$(curl -sf "https://registry.npmjs.org/@happier-dev/cli" | jq -r '."dist-tags"."${{ matrix.npm_tag }}"')
+            # Resolve from the versioned cli-v* tags rather than the rolling cli-stable/preview/dev
+            # releases, which upstream does not always update (e.g. cli-dev stayed on dev.2 after dev.3).
+            # Take the highest version whose checksums file is published (assets may still be uploading).
+            VERSION=""
+            for v in $(gh api "repos/happier-dev/happier/git/matching-refs/tags/cli-v" --jq '.[].ref' \
+                | sed 's#^refs/tags/cli-v##' | grep -E -e '${{ matrix.version_pattern }}' | sort -rV | head -5); do
+              if curl -sfIL -o /dev/null "https://github.com/happier-dev/happier/releases/download/cli-v${v}/checksums-happier-v${v}.txt"; then
+                VERSION="$v"; break
+              fi
+              echo "cli-v${v}: checksums not published yet, trying older"
+            done
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
           CURRENT=$(grep '^\s*version ' "${{ matrix.formula }}" | sed -E 's/.*"([^"]+)".*/\1/')
-          if [ "$CURRENT" = "$VERSION" ]; then
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "::error::Could not resolve version for ${{ matrix.channel }}"; exit 1
+          fi
+          NEWEST=$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
+          if [ -z "${{ github.event.inputs.version }}" ] && [ "$NEWEST" != "$VERSION" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "${{ matrix.channel }}: formula v${CURRENT} is newer than resolved v${VERSION}, skipping."
+          elif [ "$CURRENT" = "$VERSION" ] && ! grep -q 'sha256 ""' "${{ matrix.formula }}"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "${{ matrix.channel }}: already at v${VERSION}, skipping."
           else
@@ -76,15 +86,16 @@ jobs:
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           BASE="https://github.com/happier-dev/happier/releases/download/cli-v${VERSION}"
-          SUMS=$(curl -sf "${BASE}/checksums-happier-v${VERSION}.txt")
-          DARWIN_ARM64=$(echo "$SUMS" | awk '/darwin-arm64/ {print $1}')
-          DARWIN_X64=$(echo   "$SUMS" | awk '/darwin-x64/   {print $1}')
-          LINUX_ARM64=$(echo  "$SUMS" | awk '/linux-arm64/  {print $1}')
-          LINUX_X64=$(echo    "$SUMS" | awk '/linux-x64/    {print $1}')
-          echo "darwin_arm64=$DARWIN_ARM64" >> "$GITHUB_OUTPUT"
-          echo "darwin_x64=$DARWIN_X64"     >> "$GITHUB_OUTPUT"
-          echo "linux_arm64=$LINUX_ARM64"   >> "$GITHUB_OUTPUT"
-          echo "linux_x64=$LINUX_X64"       >> "$GITHUB_OUTPUT"
+          SUMS=$(curl -sfL "${BASE}/checksums-happier-v${VERSION}.txt")
+          for platform in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+            # Match the exact CLI tarball name; the checksums file also lists
+            # memory-runtime, difftastic and json assets for each platform.
+            SHA=$(echo "$SUMS" | awk -v f="happier-v${VERSION}-${platform}.tar.gz" '$2 == f {print $1}')
+            if ! echo "$SHA" | grep -qE '^[a-f0-9]{64}$'; then
+              echo "::error::Missing/invalid checksum for ${platform} (v${VERSION})"; exit 1
+            fi
+            echo "${platform//-/_}=$SHA" >> "$GITHUB_OUTPUT"
+          done
 
       - name: Update formula
         if: env.SKIP != 'true' && steps.resolve.outputs.skip == 'false'
@@ -104,12 +115,15 @@ jobs:
           }
           for platform, sha in sums.items():
             s = re.sub(
-              r'(' + re.escape(platform) + r'\.tar\.gz"\s*\n\s*sha256 ")[a-f0-9]+(")',
+              r'(' + re.escape(platform) + r'\.tar\.gz"\s*\n\s*sha256 ")[a-f0-9]*(")',
               r'\g<1>' + sha + r'\g<2>',
               s,
             )
           p.write_text(s)
           EOF
+          if grep -q 'sha256 ""' "${FORMULA}"; then
+            echo "::error::Formula still has empty sha256"; exit 1
+          fi
 
       - name: Commit and push
         if: env.SKIP != 'true' && steps.resolve.outputs.skip == 'false'
