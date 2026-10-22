@@ -1,7 +1,7 @@
 class Happier < Formula
   desc "Mobile and Web client for Claude Code and Codex"
   homepage "https://github.com/happier-dev/happier"
-  version "0.2.16"
+  version "0.2.17"
 
   conflicts_with "happier-next",
     because: "both install the `happier` binary"
@@ -11,22 +11,22 @@ class Happier < Formula
   on_macos do
     on_arm do
       url "https://github.com/happier-dev/happier/releases/download/cli-v#{version}/happier-v#{version}-darwin-arm64.tar.gz"
-      sha256 "56c693a3fe4dc747534595814b33ce32b0aac0b01ca5f18adaca503c09e661ce"
+      sha256 "13e12436161dcb73fc927a87de02d565d02f5be69bed540cf6f707ebee0ae1c1"
     end
     on_intel do
       url "https://github.com/happier-dev/happier/releases/download/cli-v#{version}/happier-v#{version}-darwin-x64.tar.gz"
-      sha256 "76e9a41834741758b0e870d281f1546eb268fe35b6c5946e2bafc6993bd1828a"
+      sha256 "7c5bb422579a8521f01eb8b6b24f13d7af6103d331027678bc739e3a797e0c0c"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/happier-dev/happier/releases/download/cli-v#{version}/happier-v#{version}-linux-arm64.tar.gz"
-      sha256 "37dad9cde5545d82b843a49b7229949213221c4e976e8c58a35fb34d76e9b20b"
+      sha256 "80e3110dc55a2a22f0cca6d26903715b67581eb5509be4e4a403b5898214bb44"
     end
     on_intel do
       url "https://github.com/happier-dev/happier/releases/download/cli-v#{version}/happier-v#{version}-linux-x64.tar.gz"
-      sha256 "50018f306c8e985ea1bd05128d73f128a29f229eb8a7b32a7bb4294ce6ca7a32"
+      sha256 "969328ed5296119d18e3ca48839e0baafb5d05d1ed7047afacfbac064fd8cbc4"
     end
   end
 
